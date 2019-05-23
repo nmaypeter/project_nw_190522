@@ -107,6 +107,7 @@ class Diffusion:
 
         return round(ep, 4)
 
+
 def getProductWeight(prod_list, wallet_dist_name):
     price_list = [prod[2] for prod in prod_list]
     mu, sigma = 0, 1
@@ -121,6 +122,7 @@ def getProductWeight(prod_list, wallet_dist_name):
     pw_list = [round(float(Y[np.argwhere(X == p)]), 4) for p in price_list]
 
     return pw_list
+
 
 class DiffusionPW:
     def __init__(self, graph_dict, product_list, product_weight_list):
@@ -222,6 +224,7 @@ class DiffusionPW:
 
         return round(ep, 4)
 
+
 def getExpectedInf(i_dict):
     ei = 0.0
     for item in i_dict:
@@ -232,11 +235,13 @@ def getExpectedInf(i_dict):
 
     return ei
 
+
 def insertProbAncIntoDict(i_dict, i_node, i_prob, i_anc_set):
     if i_node not in i_dict:
         i_dict[i_node] = [(i_prob, i_anc_set)]
     else:
         i_dict[i_node].append((i_prob, i_anc_set))
+
 
 def insertProbIntoDict(i_dict, i_node, i_prob):
     if i_node not in i_dict:
@@ -244,12 +249,14 @@ def insertProbIntoDict(i_dict, i_node, i_prob):
     else:
         i_dict[i_node].append(i_prob)
 
+
 def combineDict(o_dict, n_dict):
     for item in n_dict:
         if item not in o_dict:
             o_dict[item] = n_dict[item]
         else:
             o_dict[item] += n_dict[item]
+
 
 class DiffusionAccProb:
     def __init__(self, graph_dict, product_list):
