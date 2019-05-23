@@ -20,7 +20,7 @@ class SeedSelectionPMIS:
     def generateCelfHeap(self):
         # -- calculate expected profit for all combinations of nodes and products --
         ### celf_item: (list) (mg, k_prod, i_node, flag)
-        celf_heap = [(0.0, -1, '-1', 0)]
+        celf_heap = [[(0.0, -1, '-1', 0)] for _ in range(self.num_product)]
 
         diff_ss = Diffusion(self.graph_dict, self.product_list)
         for i in self.graph_dict:
@@ -32,7 +32,7 @@ class SeedSelectionPMIS:
                 for k in range(self.num_product):
                     mg = safe_div(ep * self.product_list[k][0], self.product_list[0][0])
                     celf_item = (mg, k, i, 0)
-                    heap.heappush_max(celf_heap, celf_item)
+                    heap.heappush_max(celf_heap[k], celf_item)
 
         return celf_heap
 
