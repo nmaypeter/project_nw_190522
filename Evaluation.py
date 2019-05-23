@@ -136,7 +136,7 @@ class EvaluationM:
         self.dataset_name = dataset_name
         self.product_name = product_name
         self.cascade_model = cascade_model
-        self.wpiwp = bool(1)
+        self.wpiwp = True
         self.eva_monte_carlo = 100
 
     def evaluate(self, bi, wallet_distribution_type, ppp, seed_set_sequence, ss_time_sequence):
