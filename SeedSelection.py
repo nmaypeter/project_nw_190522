@@ -4,117 +4,26 @@ from SeedSelection_HighDegree import *
 from SeedSelection_PMIS import *
 from SeedSelection_Random import *
 from Evaluation import *
-from openpyxl import *
+import os
 import time
 
 
-def saveTempSequence(model_name, dataset_name, product_name, cascade_model, b_iter, temp_sequence):
-    temp_seq = []
-    for t in range(len(temp_sequence) - 1):
-        temp_seq.append(str(temp_sequence[t]))
-    temp_heap_seq, temp_heap = [], []
-    for t_id, t in enumerate(temp_sequence[-1]):
-        temp_heap.append(t)
-        if len(temp_heap) == 1000 or t_id + 1 == len(temp_sequence[-1]):
-            temp_heap_seq.append(str(temp_heap))
-            temp_heap = []
-    wb = load_workbook('temp.xlsx')
-    sheet = wb.active
-    temp = [model_name, dataset_name, product_name, cascade_model, b_iter]
-    temp_seq = temp + [0, '\t'] + temp_seq + temp_heap_seq
-    sheet.append(temp_seq)
-    wb.save('temp.xlsx')
+def saveTempSequence(file_name, temp_sequence):
+    path = 'temp_log/' + file_name + '.txt'
+    fw = open(path, 'w')
+    for t in temp_sequence:
+        fw.write(str(t) + '\n')
+    fw.close()
 
 
-def saveTempSequenceAP(model_name, dataset_name, product_name, cascade_model, b_iter, temp_sequence, num_product):
-    temp_seq = []
-    for t in range(len(temp_sequence) - 2):
-        temp_seq.append(str(temp_sequence[t]))
-    temp_seed_forest_seq = [[] for _ in range(num_product)]
-    for k in range(num_product):
-        for t in temp_sequence[-2][k]:
-            temp_seed_forest_seq[k].append(str({t}))
-    temp_heap_seq, temp_heap = [], []
-    for t_id, t in enumerate(temp_sequence[-1]):
-        temp_heap.append(t)
-        if len(temp_heap) == 1000 or t_id + 1 == len(temp_sequence[-1]):
-            temp_heap_seq.append(str(temp_heap))
-            temp_heap = []
-    wb = load_workbook('temp.xlsx')
-    sheet = wb.active
-    temp = [model_name, dataset_name, product_name, cascade_model, b_iter]
-    temp_seq = temp + [0, '\t'] + temp_seq + temp_heap_seq
-    sheet.append(temp_seq)
-    for k in range(num_product):
-        temp_seed_forest_seq[k] = temp + [k + 1, '\t'] + temp_seq + temp_seed_forest_seq[k]
-        sheet.append(temp_seed_forest_seq[k])
-    wb.save('temp.xlsx')
-
-
-def getTempSequence(model_name, dataset_name, product_name, cascade_model, b_iter, prior_to_heap):
+def getTempSequence(file_name):
+    path = 'temp_log/' + file_name + '.txt'
     temp_sequence = []
-    coordinate_row = 0
-    wb = load_workbook('temp.xlsx')
-    sheet = wb.active
-    for row in sheet.rows:
-        temp_model_name, temp_dataset_name, temp_product_name, temp_cascade_model, temp_budget, meaning = list(row)[0:6]
-        if temp_model_name.value != model_name:
-            continue
-        if temp_dataset_name.value != dataset_name:
-            continue
-        if temp_product_name.value != product_name:
-            continue
-        if temp_cascade_model.value != cascade_model:
-            continue
-        if temp_budget.value != b_iter:
-            continue
-        coordinate_row = temp_cascade_model.row
-        for cell in list(row)[7: 7 + prior_to_heap]:
-            temp_sequence.append(eval(cell.value))
-        temp_heap = []
-        for cell in list(row)[7 + prior_to_heap:]:
-            temp_heap += eval(cell.value)
-        temp_sequence.append(temp_heap)
-        break
-    sheet.delete_rows(coordinate_row)
-    wb.save('temp.xlsx')
-
-    return temp_sequence
-
-
-def getTempSequenceAP(model_name, dataset_name, product_name, cascade_model, b_iter, prior_to_heap, num_product):
-    temp_sequence, temp_heap_seq, temp_seed_forest_seq = [], [], [{} for _ in range(num_product)]
-    coordinate_row = []
-    wb = load_workbook('temp.xlsx')
-    sheet = wb.active
-    for row in sheet.rows:
-        temp_model_name, temp_dataset_name, temp_product_name, temp_cascade_model, temp_budget, meaning = list(row)[0:6]
-        if temp_model_name.value != model_name:
-            continue
-        if temp_dataset_name.value != dataset_name:
-            continue
-        if temp_product_name.value != product_name:
-            continue
-        if temp_cascade_model.value != cascade_model:
-            continue
-        if temp_budget.value != b_iter:
-            continue
-        coordinate_row.append(temp_cascade_model.row)
-        if meaning == 0:
-            for cell in list(row)[7: 7 + prior_to_heap]:
-                temp_sequence.append(eval(cell.value))
-            for cell in list(row)[7 + prior_to_heap:]:
-                temp_heap_seq += eval(cell.value)
-        else:
-            k = meaning - 1
-            for cell in list(row)[7:]:
-                temp_seed_forest_seq[k].update(eval(cell.value))
-    temp_sequence.append(temp_seed_forest_seq)
-    temp_sequence.append(temp_heap_seq)
-    coordinate_row.reverse()
-    for row in coordinate_row:
-        sheet.delete_rows(row)
-    wb.save('temp.xlsx')
+    with open(path) as f:
+        for t_id, t in enumerate(f):
+            temp_sequence.append(eval(t))
+    f.close()
+    os.remove(path)
 
     return temp_sequence
 
@@ -154,7 +63,7 @@ class Model:
             celf_heap = ssng_model.generateCelfHeap()
             ss_acc_time = round(time.time() - ss_start_time, 4)
             temp_sequence_flag = True
-            saveTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter,
+            saveTempSequence(self.model_name + '_' + self.dataset_name + '_' + self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter),
                              [ss_acc_time, now_budget, now_profit, seed_set, celf_heap])
             while temp_sequence_flag:
                 ss_start_time = time.time()
@@ -162,7 +71,7 @@ class Model:
                 bi_index = self.budget_iteration.index(b_iter)
                 total_budget = round(total_cost / (2 ** b_iter), 4)
                 [ss_acc_time, now_budget, now_profit, seed_set, celf_heap] = \
-                    getTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter, 4)
+                    getTempSequence(self.model_name + '_' + self.dataset_name + '_' + self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter))
                 print('@ ' + self.model_name + ' seed selection @ dataset_name = ' + self.dataset_name + '_' + self.cascade_model + ', product_name = ' + self.product_name +
                       ', bud_iter = ' + str(b_iter) + ', budget = ' + str(total_budget) + ', sample_count = ' + str(sample_count))
                 mep_item = heap.heappop_max(celf_heap)
@@ -176,7 +85,7 @@ class Model:
                         temp_sequence_flag = True
                         b_iter = bud_iter.pop(0)
                         heap.heappush_max(celf_heap, mep_item)
-                        saveTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter,
+                        saveTempSequence(self.model_name + '_' + self.dataset_name + '_' + self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter),
                                          [ss_time, now_budget, now_profit, seed_set, celf_heap])
                         mep_item = heap.heappop_max(celf_heap)
                         mep_mg, mep_k_prod, mep_i_node, mep_flag = mep_item
@@ -241,7 +150,7 @@ class Model:
             celf_heap = ssng_model.generateCelfHeapR()
             ss_acc_time = round(time.time() - ss_start_time, 4)
             temp_sequence_flag = True
-            saveTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter,
+            saveTempSequence(self.model_name + '_' + self.dataset_name + '_' + self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter),
                              [ss_acc_time, now_budget, now_profit, seed_set, celf_heap])
             while temp_sequence_flag:
                 ss_start_time = time.time()
@@ -249,7 +158,7 @@ class Model:
                 bi_index = self.budget_iteration.index(b_iter)
                 total_budget = round(total_cost / (2 ** b_iter), 4)
                 [ss_acc_time, now_budget, now_profit, seed_set, celf_heap] = \
-                    getTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter, 4)
+                    getTempSequence(self.model_name + '_' + self.dataset_name + '_' + self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter))
                 print('@ ' + self.model_name + ' seed selection @ dataset_name = ' + self.dataset_name + '_' + self.cascade_model + ', product_name = ' + self.product_name +
                       ', bud_iter = ' + str(b_iter) + ', budget = ' + str(total_budget) + ', sample_count = ' + str(sample_count))
                 mep_item = heap.heappop_max(celf_heap)
@@ -263,7 +172,7 @@ class Model:
                         temp_sequence_flag = True
                         b_iter = bud_iter.pop(0)
                         heap.heappush_max(celf_heap, mep_item)
-                        saveTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter,
+                        saveTempSequence(self.model_name + '_' + self.dataset_name + '_' + self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter),
                                          [ss_time, now_budget, now_profit, seed_set, celf_heap])
                         mep_item = heap.heappop_max(celf_heap)
                         mep_ratio, mep_k_prod, mep_i_node, mep_flag = mep_item
@@ -329,7 +238,7 @@ class Model:
             celf_heap = ssng_model.generateCelfHeapR()
             ss_acc_time = round(time.time() - ss_start_time, 4)
             temp_sequence_flag = True
-            saveTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter,
+            saveTempSequence(self.model_name + '_' + self.dataset_name + '_' + self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter),
                              [ss_acc_time, now_budget, now_profit, seed_set, celf_heap])
             while temp_sequence_flag:
                 ss_start_time = time.time()
@@ -337,7 +246,7 @@ class Model:
                 bi_index = self.budget_iteration.index(b_iter)
                 total_budget = round(total_cost / (2 ** b_iter), 4)
                 [ss_acc_time, now_budget, now_profit, seed_set, celf_heap] = \
-                    getTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter, 4)
+                    getTempSequence(self.model_name + '_' + self.dataset_name + '_' + self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter))
                 print('@ ' + self.model_name + ' seed selection @ dataset_name = ' + self.dataset_name + '_' + self.cascade_model + ', product_name = ' + self.product_name +
                       ', bud_iter = ' + str(b_iter) + ', budget = ' + str(total_budget) + ', sample_count = ' + str(sample_count))
                 mep_item = heap.heappop_max(celf_heap)
@@ -351,7 +260,7 @@ class Model:
                         temp_sequence_flag = True
                         b_iter = bud_iter.pop(0)
                         heap.heappush_max(celf_heap, mep_item)
-                        saveTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter,
+                        saveTempSequence(self.model_name + '_' + self.dataset_name + '_' + self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter),
                                          [ss_time, now_budget, now_profit, seed_set, celf_heap])
                         mep_item = heap.heappop_max(celf_heap)
                         mep_seed_ratio, mep_k_prod, mep_i_node, mep_flag = mep_item
@@ -419,15 +328,15 @@ class Model:
             celf_heap = ssngap_model.generateCelfHeap()
             ss_acc_time = round(time.time() - ss_start_time, 4)
             temp_sequence_flag = True
-            saveTempSequenceAP(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter,
-                               [ss_acc_time, now_budget, now_profit, seed_set, expected_profit_k, now_seed_forest, celf_heap], num_product)
+            saveTempSequence(self.model_name + '_' + self.dataset_name + '_' + self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter),
+                             [ss_acc_time, now_budget, now_profit, seed_set, expected_profit_k, now_seed_forest, celf_heap])
             while temp_sequence_flag:
                 ss_start_time = time.time()
                 temp_sequence_flag = False
                 bi_index = self.budget_iteration.index(b_iter)
                 total_budget = round(total_cost / (2 ** b_iter), 4)
                 [ss_acc_time, now_budget, now_profit, seed_set, expected_profit_k, now_seed_forest, celf_heap] = \
-                    getTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter, 6)
+                    getTempSequence(self.model_name + '_' + self.dataset_name + '_' + self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter))
                 print('@ ' + self.model_name + ' seed selection @ dataset_name = ' + self.dataset_name + '_' + self.cascade_model + ', product_name = ' + self.product_name +
                       ', bud_iter = ' + str(b_iter) + ', budget = ' + str(total_budget) + ', sample_count = ' + str(sample_count))
                 mep_item = heap.heappop_max(celf_heap)
@@ -441,7 +350,7 @@ class Model:
                         temp_sequence_flag = True
                         b_iter = bud_iter.pop(0)
                         heap.heappush_max(celf_heap, mep_item)
-                        saveTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter,
+                        saveTempSequence(self.model_name + '_' + self.dataset_name + '_' + self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter),
                                          [ss_time, now_budget, now_profit, seed_set, expected_profit_k, now_seed_forest, celf_heap])
                         mep_item = heap.heappop_max(celf_heap)
                         mep_mg, mep_k_prod, mep_i_node, mep_flag = mep_item
@@ -520,7 +429,7 @@ class Model:
             celf_heap = ssngap_model.generateCelfHeapR()
             ss_acc_time = round(time.time() - ss_start_time, 4)
             temp_sequence_flag = True
-            saveTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter,
+            saveTempSequence(self.model_name + '_' + self.dataset_name + '_' + self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter),
                              [ss_acc_time, now_budget, now_profit, seed_set, expected_profit_k, now_seed_forest, celf_heap])
             while temp_sequence_flag:
                 ss_start_time = time.time()
@@ -528,7 +437,7 @@ class Model:
                 bi_index = self.budget_iteration.index(b_iter)
                 total_budget = round(total_cost / (2 ** b_iter), 4)
                 [ss_acc_time, now_budget, now_profit, seed_set, expected_profit_k, now_seed_forest, celf_heap] = \
-                    getTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter, 6)
+                    getTempSequence(self.model_name + '_' + self.dataset_name + '_' + self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter))
                 print('@ ' + self.model_name + ' seed selection @ dataset_name = ' + self.dataset_name + '_' + self.cascade_model + ', product_name = ' + self.product_name +
                       ', bud_iter = ' + str(b_iter) + ', budget = ' + str(total_budget) + ', sample_count = ' + str(sample_count))
                 mep_item = heap.heappop_max(celf_heap)
@@ -542,7 +451,7 @@ class Model:
                         temp_sequence_flag = True
                         b_iter = bud_iter.pop(0)
                         heap.heappush_max(celf_heap, mep_item)
-                        saveTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter,
+                        saveTempSequence(self.model_name + '_' + self.dataset_name + '_' + self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter),
                                          [ss_time, now_budget, now_profit, seed_set, expected_profit_k, now_seed_forest, celf_heap])
                         mep_item = heap.heappop_max(celf_heap)
                         mep_ratio, mep_k_prod, mep_i_node, mep_flag = mep_item
@@ -622,7 +531,7 @@ class Model:
             celf_heap = ssngap_model.generateCelfHeapR()
             ss_acc_time = round(time.time() - ss_start_time, 4)
             temp_sequence_flag = True
-            saveTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter,
+            saveTempSequence(self.model_name + '_' + self.dataset_name + '_' + self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter),
                              [ss_acc_time, now_budget, now_profit, seed_set, expected_profit_k, now_seed_forest, celf_heap])
             while temp_sequence_flag:
                 ss_start_time = time.time()
@@ -630,7 +539,7 @@ class Model:
                 bi_index = self.budget_iteration.index(b_iter)
                 total_budget = round(total_cost / (2 ** b_iter), 4)
                 [ss_acc_time, now_budget, now_profit, seed_set, expected_profit_k, now_seed_forest, celf_heap] = \
-                    getTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter, 6)
+                    getTempSequence(self.model_name + '_' + self.dataset_name + '_' + self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter))
                 print('@ ' + self.model_name + ' seed selection @ dataset_name = ' + self.dataset_name + '_' + self.cascade_model + ', product_name = ' + self.product_name +
                       ', bud_iter = ' + str(b_iter) + ', budget = ' + str(total_budget) + ', sample_count = ' + str(sample_count))
                 mep_item = heap.heappop_max(celf_heap)
@@ -644,7 +553,7 @@ class Model:
                         temp_sequence_flag = True
                         b_iter = bud_iter.pop(0)
                         heap.heappush_max(celf_heap, mep_item)
-                        saveTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter,
+                        saveTempSequence(self.model_name + '_' + self.dataset_name + '_' + self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter),
                                          [ss_time, now_budget, now_profit, seed_set, expected_profit_k, now_seed_forest, celf_heap])
                         mep_item = heap.heappop_max(celf_heap)
                         mep_seed_ratio, mep_k_prod, mep_i_node, mep_flag = mep_item
@@ -711,7 +620,7 @@ class Model:
 
         seed_set_sequence = [[-1 for _ in range(self.sample_number)] for _ in range(len(self.budget_iteration))]
         ss_time_sequence = [[-1 for _ in range(self.sample_number)] for _ in range(len(self.budget_iteration))]
-        sshd_model = SeedSelectionHD(graph_dict, seed_cost_dict, product_list)
+        sshd_model = SeedSelectionHD(self.dataset_name, graph_dict, product_list)
         for sample_count in range(self.sample_number):
             ss_start_time = time.time()
             bud_iter = self.budget_iteration.copy()
@@ -721,7 +630,7 @@ class Model:
             degree_heap = sshd_model.generateDegreeHeap()
             ss_acc_time = round(time.time() - ss_start_time, 4)
             temp_sequence_flag = True
-            saveTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter,
+            saveTempSequence(self.model_name + '_' + self.dataset_name + '_' + self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter),
                              [ss_acc_time, now_budget, seed_set, degree_heap])
             while temp_sequence_flag:
                 ss_start_time = time.time()
@@ -729,7 +638,7 @@ class Model:
                 bi_index = self.budget_iteration.index(b_iter)
                 total_budget = round(total_cost / (2 ** b_iter), 4)
                 [ss_acc_time, now_budget, seed_set, degree_heap] = \
-                    getTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter, 3)
+                    getTempSequence(self.model_name + '_' + self.dataset_name + '_' + self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter))
                 print('@ ' + self.model_name + ' seed selection @ dataset_name = ' + self.dataset_name + '_' + self.cascade_model + ', product_name = ' + self.product_name +
                       ', bud_iter = ' + str(b_iter) + ', budget = ' + str(total_budget) + ', sample_count = ' + str(sample_count))
                 mep_item = heap.heappop_max(degree_heap)
@@ -742,7 +651,7 @@ class Model:
                         temp_sequence_flag = True
                         b_iter = bud_iter.pop(0)
                         heap.heappush_max(degree_heap, mep_item)
-                        saveTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter,
+                        saveTempSequence(self.model_name + '_' + self.dataset_name + '_' + self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter),
                                          [ss_time, now_budget, seed_set, degree_heap])
                         mep_item = heap.heappop_max(degree_heap)
                         mep_deg, mep_k_prod, mep_i_node = mep_item
@@ -784,7 +693,7 @@ class Model:
 
         seed_set_sequence = [[-1 for _ in range(self.sample_number)] for _ in range(len(self.budget_iteration))]
         ss_time_sequence = [[-1 for _ in range(self.sample_number)] for _ in range(len(self.budget_iteration))]
-        sshd_model = SeedSelectionHD(graph_dict, seed_cost_dict, product_list)
+        sshd_model = SeedSelectionHD(self.dataset_name, graph_dict, product_list)
         for sample_count in range(self.sample_number):
             ss_start_time = time.time()
             bud_iter = self.budget_iteration.copy()
@@ -794,7 +703,7 @@ class Model:
             degree_heap = sshd_model.generateExpandDegreeHeap()
             ss_acc_time = round(time.time() - ss_start_time, 4)
             temp_sequence_flag = True
-            saveTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter,
+            saveTempSequence(self.model_name + '_' + self.dataset_name + '_' + self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter),
                              [ss_acc_time, now_budget, seed_set, degree_heap])
             while temp_sequence_flag:
                 ss_start_time = time.time()
@@ -802,7 +711,7 @@ class Model:
                 bi_index = self.budget_iteration.index(b_iter)
                 total_budget = round(total_cost / (2 ** b_iter), 4)
                 [ss_acc_time, now_budget, seed_set, degree_heap] = \
-                    getTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter, 3)
+                    getTempSequence(self.model_name + '_' + self.dataset_name + '_' + self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter))
                 print('@ ' + self.model_name + ' seed selection @ dataset_name = ' + self.dataset_name + '_' + self.cascade_model + ', product_name = ' + self.product_name +
                       ', bud_iter = ' + str(b_iter) + ', budget = ' + str(total_budget) + ', sample_count = ' + str(sample_count))
                 mep_item = heap.heappop_max(degree_heap)
@@ -815,7 +724,7 @@ class Model:
                         temp_sequence_flag = True
                         b_iter = bud_iter.pop(0)
                         heap.heappush_max(degree_heap, mep_item)
-                        saveTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter,
+                        saveTempSequence(self.model_name + '_' + self.dataset_name + '_' + self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter),
                                          [ss_time, now_budget, seed_set, degree_heap])
                         mep_item = heap.heappop_max(degree_heap)
                         mep_deg, mep_k_prod, mep_i_node = mep_item
@@ -871,7 +780,7 @@ class Model:
                 s_matrix, c_matrix = [[set() for _ in range(num_product)]], [0.0]
                 ss_acc_time = round(time.time() - ss_start_time, 4)
                 temp_sequence_flag = True
-                saveTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter,
+                saveTempSequence(self.model_name + '_' + self.dataset_name + '_' + self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter),
                                  [ss_acc_time, now_budget, now_profit, seed_set, s_matrix, c_matrix, celf_heap[k]])
                 while temp_sequence_flag:
                     ss_start_time = time.time()
@@ -879,7 +788,7 @@ class Model:
                     bi_index = self.budget_iteration.index(b_iter)
                     total_budget = round(total_cost / (2 ** b_iter), 4)
                     [ss_acc_time, now_budget, now_profit, seed_set, s_matrix, c_matrix, celf_heap_k] = \
-                        getTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter, 6)
+                        getTempSequence(self.model_name + '_' + self.dataset_name + '_' + self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter))
                     print('@ ' + self.model_name + ' seed selection @ dataset_name = ' + self.dataset_name + '_' + self.cascade_model + ', product_name = ' + self.product_name +
                           ', bud_iter = ' + str(b_iter) + ', budget = ' + str(total_budget) + ', sample_count = ' + str(sample_count))
                     mep_item = heap.heappop_max(celf_heap_k)
@@ -893,7 +802,7 @@ class Model:
                             temp_sequence_flag = True
                             b_iter = bud_iter.pop(0)
                             heap.heappush_max(celf_heap_k, mep_item)
-                            saveTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter,
+                            saveTempSequence(self.model_name + '_' + self.dataset_name + '_' + self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter),
                                              [ss_time, now_budget, now_profit, seed_set, s_matrix, c_matrix, celf_heap_k])
                             mep_item = heap.heappop_max(celf_heap_k)
                             mep_mg, mep_k_prod, mep_i_node, mep_flag = mep_item
@@ -974,7 +883,7 @@ class Model:
             random_node_set = ssr_model.generateRandomNodeSet()
             ss_acc_time = round(time.time() - ss_start_time, 4)
             temp_sequence_flag = True
-            saveTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter,
+            saveTempSequence(self.model_name + '_' + self.dataset_name + '_' + self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter),
                              [ss_acc_time, now_budget, seed_set, random_node_set])
             while temp_sequence_flag:
                 ss_start_time = time.time()
@@ -982,7 +891,7 @@ class Model:
                 bi_index = self.budget_iteration.index(b_iter)
                 total_budget = round(total_cost / (2 ** b_iter), 4)
                 [ss_acc_time, now_budget, seed_set, random_node_set] = \
-                    getTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter, 3)
+                    getTempSequence(self.model_name + '_' + self.dataset_name + '_' + self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter))
                 print('@ ' + self.model_name + ' seed selection @ dataset_name = ' + self.dataset_name + '_' + self.cascade_model + ', product_name = ' + self.product_name +
                       ', bud_iter = ' + str(b_iter) + ', budget = ' + str(total_budget) + ', sample_count = ' + str(sample_count))
                 mep_item = ssr_model.selectRandomSeed(random_node_set)
@@ -995,10 +904,10 @@ class Model:
                         temp_sequence_flag = True
                         b_iter = bud_iter.pop(0)
                         random_node_set.add(mep_item)
-                        saveTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter,
+                        saveTempSequence(self.model_name + '_' + self.dataset_name + '_' + self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter),
                                          [ss_time, now_budget, seed_set, random_node_set])
                         random_node_set.remove(mep_item)
-                        mep_deg, mep_k_prod, mep_i_node = mep_item
+                        mep_k_prod, mep_i_node = mep_item
 
                     if round(now_budget + sc, 4) > total_budget:
                         mep_item = ssr_model.selectRandomSeed(random_node_set)
@@ -1064,7 +973,8 @@ class ModelPW:
             celf_heap = ssngpw_model.generateCelfHeap()
             ss_acc_time = round(time.time() - ss_start_time, 4)
             temp_sequence_flag = True
-            saveTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter,
+            saveTempSequence(self.model_name + '_' + self.wallet_distribution_type + '_' + self.dataset_name + '_' +
+                             self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter),
                              [ss_acc_time, now_budget, now_profit, seed_set, celf_heap])
             while temp_sequence_flag:
                 ss_start_time = time.time()
@@ -1072,7 +982,8 @@ class ModelPW:
                 bi_index = self.budget_iteration.index(b_iter)
                 total_budget = round(total_cost / (2 ** b_iter), 4)
                 [ss_acc_time, now_budget, now_profit, seed_set, celf_heap] = \
-                    getTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter, 4)
+                    getTempSequence(self.model_name + '_' + self.wallet_distribution_type + '_' + self.dataset_name + '_' +
+                                    self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter))
                 print('@ ' + self.model_name + ' seed selection @ dataset_name = ' + self.dataset_name + '_' + self.cascade_model + ', product_name = ' + self.product_name +
                       ', bud_iter = ' + str(b_iter) + ', budget = ' + str(total_budget) + ', sample_count = ' + str(sample_count))
                 mep_item = heap.heappop_max(celf_heap)
@@ -1086,7 +997,8 @@ class ModelPW:
                         temp_sequence_flag = True
                         b_iter = bud_iter.pop(0)
                         heap.heappush_max(celf_heap, mep_item)
-                        saveTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter,
+                        saveTempSequence(self.model_name + '_' + self.wallet_distribution_type + '_' + self.dataset_name + '_' +
+                                         self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter),
                                          [ss_time, now_budget, now_profit, seed_set, celf_heap])
                         mep_item = heap.heappop_max(celf_heap)
                         mep_mg, mep_k_prod, mep_i_node, mep_flag = mep_item
@@ -1151,7 +1063,8 @@ class ModelPW:
             celf_heap = ssngpw_model.generateCelfHeapR()
             ss_acc_time = round(time.time() - ss_start_time, 4)
             temp_sequence_flag = True
-            saveTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter,
+            saveTempSequence(self.model_name + '_' + self.wallet_distribution_type + '_' + self.dataset_name + '_' +
+                             self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter),
                              [ss_acc_time, now_budget, now_profit, seed_set, celf_heap])
             while temp_sequence_flag:
                 ss_start_time = time.time()
@@ -1159,7 +1072,8 @@ class ModelPW:
                 bi_index = self.budget_iteration.index(b_iter)
                 total_budget = round(total_cost / (2 ** b_iter), 4)
                 [ss_acc_time, now_budget, now_profit, seed_set, celf_heap] = \
-                    getTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter, 4)
+                    getTempSequence(self.model_name + '_' + self.wallet_distribution_type + '_' + self.dataset_name + '_' +
+                                    self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter))
                 print('@ ' + self.model_name + ' seed selection @ dataset_name = ' + self.dataset_name + '_' + self.cascade_model + ', product_name = ' + self.product_name +
                       ', bud_iter = ' + str(b_iter) + ', budget = ' + str(total_budget) + ', sample_count = ' + str(sample_count))
                 mep_item = heap.heappop_max(celf_heap)
@@ -1173,7 +1087,8 @@ class ModelPW:
                         temp_sequence_flag = True
                         b_iter = bud_iter.pop(0)
                         heap.heappush_max(celf_heap, mep_item)
-                        saveTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter,
+                        saveTempSequence(self.model_name + '_' + self.wallet_distribution_type + '_' + self.dataset_name + '_' +
+                                         self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter),
                                          [ss_time, now_budget, now_profit, seed_set, celf_heap])
                         mep_item = heap.heappop_max(celf_heap)
                         mep_ratio, mep_k_prod, mep_i_node, mep_flag = mep_item
@@ -1239,7 +1154,8 @@ class ModelPW:
             celf_heap = ssngpw_model.generateCelfHeapR()
             ss_acc_time = round(time.time() - ss_start_time, 4)
             temp_sequence_flag = True
-            saveTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter,
+            saveTempSequence(self.model_name + '_' + self.wallet_distribution_type + '_' + self.dataset_name + '_' +
+                             self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter),
                              [ss_acc_time, now_budget, now_profit, seed_set, celf_heap])
             while temp_sequence_flag:
                 ss_start_time = time.time()
@@ -1247,7 +1163,8 @@ class ModelPW:
                 bi_index = self.budget_iteration.index(b_iter)
                 total_budget = round(total_cost / (2 ** b_iter), 4)
                 [ss_acc_time, now_budget, now_profit, seed_set, celf_heap] = \
-                    getTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter, 4)
+                    getTempSequence(self.model_name + '_' + self.wallet_distribution_type + '_' + self.dataset_name + '_' +
+                                    self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter))
                 print('@ ' + self.model_name + ' seed selection @ dataset_name = ' + self.dataset_name + '_' + self.cascade_model + ', product_name = ' + self.product_name +
                       ', bud_iter = ' + str(b_iter) + ', budget = ' + str(total_budget) + ', sample_count = ' + str(sample_count))
                 mep_item = heap.heappop_max(celf_heap)
@@ -1261,7 +1178,8 @@ class ModelPW:
                         temp_sequence_flag = True
                         b_iter = bud_iter.pop(0)
                         heap.heappush_max(celf_heap, mep_item)
-                        saveTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter,
+                        saveTempSequence(self.model_name + '_' + self.wallet_distribution_type + '_' + self.dataset_name + '_' +
+                                         self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter),
                                          [ss_time, now_budget, now_profit, seed_set, celf_heap])
                         mep_item = heap.heappop_max(celf_heap)
                         mep_seed_ratio, mep_k_prod, mep_i_node, mep_flag = mep_item
@@ -1329,7 +1247,8 @@ class ModelPW:
             celf_heap = ssngappw_model.generateCelfHeap()
             ss_acc_time = round(time.time() - ss_start_time, 4)
             temp_sequence_flag = True
-            saveTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter,
+            saveTempSequence(self.model_name + '_' + self.wallet_distribution_type + '_' + self.dataset_name + '_' +
+                             self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter),
                              [ss_acc_time, now_budget, now_profit, seed_set, expected_profit_k, now_seed_forest, celf_heap])
             while temp_sequence_flag:
                 ss_start_time = time.time()
@@ -1337,7 +1256,8 @@ class ModelPW:
                 bi_index = self.budget_iteration.index(b_iter)
                 total_budget = round(total_cost / (2 ** b_iter), 4)
                 [ss_acc_time, now_budget, now_profit, seed_set, expected_profit_k, now_seed_forest, celf_heap] = \
-                    getTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter, 6)
+                    getTempSequence(self.model_name + '_' + self.wallet_distribution_type + '_' + self.dataset_name + '_' +
+                                    self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter))
                 print('@ ' + self.model_name + ' seed selection @ dataset_name = ' + self.dataset_name + '_' + self.cascade_model + ', product_name = ' + self.product_name +
                       ', bud_iter = ' + str(b_iter) + ', budget = ' + str(total_budget) + ', sample_count = ' + str(sample_count))
                 mep_item = heap.heappop_max(celf_heap)
@@ -1351,7 +1271,8 @@ class ModelPW:
                         temp_sequence_flag = True
                         b_iter = bud_iter.pop(0)
                         heap.heappush_max(celf_heap, mep_item)
-                        saveTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter,
+                        saveTempSequence(self.model_name + '_' + self.wallet_distribution_type + '_' + self.dataset_name + '_' +
+                                         self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter),
                                          [ss_time, now_budget, now_profit, seed_set, expected_profit_k, now_seed_forest, celf_heap])
                         mep_item = heap.heappop_max(celf_heap)
                         mep_mg, mep_k_prod, mep_i_node, mep_flag = mep_item
@@ -1430,7 +1351,8 @@ class ModelPW:
             celf_heap = ssngappw_model.generateCelfHeapR()
             ss_acc_time = round(time.time() - ss_start_time, 4)
             temp_sequence_flag = True
-            saveTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter,
+            saveTempSequence(self.model_name + '_' + self.wallet_distribution_type + '_' + self.dataset_name + '_' +
+                             self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter),
                              [ss_acc_time, now_budget, now_profit, seed_set, expected_profit_k, now_seed_forest, celf_heap])
             while temp_sequence_flag:
                 ss_start_time = time.time()
@@ -1438,7 +1360,8 @@ class ModelPW:
                 bi_index = self.budget_iteration.index(b_iter)
                 total_budget = round(total_cost / (2 ** b_iter), 4)
                 [ss_acc_time, now_budget, now_profit, seed_set, expected_profit_k, now_seed_forest, celf_heap] = \
-                    getTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter, 6)
+                    getTempSequence(self.model_name + '_' + self.wallet_distribution_type + '_' + self.dataset_name + '_' +
+                                    self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter))
                 print('@ ' + self.model_name + ' seed selection @ dataset_name = ' + self.dataset_name + '_' + self.cascade_model + ', product_name = ' + self.product_name +
                       ', bud_iter = ' + str(b_iter) + ', budget = ' + str(total_budget) + ', sample_count = ' + str(sample_count))
                 mep_item = heap.heappop_max(celf_heap)
@@ -1452,7 +1375,8 @@ class ModelPW:
                         temp_sequence_flag = True
                         b_iter = bud_iter.pop(0)
                         heap.heappush_max(celf_heap, mep_item)
-                        saveTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter,
+                        saveTempSequence(self.model_name + '_' + self.wallet_distribution_type + '_' + self.dataset_name + '_' +
+                                         self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter),
                                          [ss_time, now_budget, now_profit, seed_set, expected_profit_k, now_seed_forest, celf_heap])
                         mep_item = heap.heappop_max(celf_heap)
                         mep_ratio, mep_k_prod, mep_i_node, mep_flag = mep_item
@@ -1532,7 +1456,8 @@ class ModelPW:
             celf_heap = ssngappw_model.generateCelfHeapR()
             ss_acc_time = round(time.time() - ss_start_time, 4)
             temp_sequence_flag = True
-            saveTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter,
+            saveTempSequence(self.model_name + '_' + self.wallet_distribution_type + '_' + self.dataset_name + '_' +
+                             self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter),
                              [ss_acc_time, now_budget, now_profit, seed_set, expected_profit_k, now_seed_forest, celf_heap])
             while temp_sequence_flag:
                 ss_start_time = time.time()
@@ -1540,7 +1465,8 @@ class ModelPW:
                 bi_index = self.budget_iteration.index(b_iter)
                 total_budget = round(total_cost / (2 ** b_iter), 4)
                 [ss_acc_time, now_budget, now_profit, seed_set, expected_profit_k, now_seed_forest, celf_heap] = \
-                    getTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter, 6)
+                    getTempSequence(self.model_name + '_' + self.wallet_distribution_type + '_' + self.dataset_name + '_' +
+                                    self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter))
                 print('@ ' + self.model_name + ' seed selection @ dataset_name = ' + self.dataset_name + '_' + self.cascade_model + ', product_name = ' + self.product_name +
                       ', bud_iter = ' + str(b_iter) + ', budget = ' + str(total_budget) + ', sample_count = ' + str(sample_count))
                 mep_item = heap.heappop_max(celf_heap)
@@ -1554,7 +1480,8 @@ class ModelPW:
                         temp_sequence_flag = True
                         b_iter = bud_iter.pop(0)
                         heap.heappush_max(celf_heap, mep_item)
-                        saveTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter,
+                        saveTempSequence(self.model_name + '_' + self.wallet_distribution_type + '_' + self.dataset_name + '_' +
+                                         self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter),
                                          [ss_time, now_budget, now_profit, seed_set, expected_profit_k, now_seed_forest, celf_heap])
                         mep_item = heap.heappop_max(celf_heap)
                         mep_seed_ratio, mep_k_prod, mep_i_node, mep_flag = mep_item
@@ -1621,7 +1548,7 @@ class ModelPW:
 
         seed_set_sequence = [[-1 for _ in range(self.sample_number)] for _ in range(len(self.budget_iteration))]
         ss_time_sequence = [[-1 for _ in range(self.sample_number)] for _ in range(len(self.budget_iteration))]
-        sshdpw_model = SeedSelectionHDPW(graph_dict, seed_cost_dict, product_list, product_weight_list)
+        sshdpw_model = SeedSelectionHDPW(self.dataset_name, graph_dict, product_list, product_weight_list)
         for sample_count in range(self.sample_number):
             ss_start_time = time.time()
             bud_iter = self.budget_iteration.copy()
@@ -1631,7 +1558,8 @@ class ModelPW:
             degree_heap = sshdpw_model.generateDegreeHeap()
             ss_acc_time = round(time.time() - ss_start_time, 4)
             temp_sequence_flag = True
-            saveTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter,
+            saveTempSequence(self.model_name + '_' + self.wallet_distribution_type + '_' + self.dataset_name + '_' +
+                             self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter),
                              [ss_acc_time, now_budget, seed_set, degree_heap])
             while temp_sequence_flag:
                 ss_start_time = time.time()
@@ -1639,7 +1567,8 @@ class ModelPW:
                 bi_index = self.budget_iteration.index(b_iter)
                 total_budget = round(total_cost / (2 ** b_iter), 4)
                 [ss_acc_time, now_budget, seed_set, degree_heap] = \
-                    getTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter, 3)
+                    getTempSequence(self.model_name + '_' + self.wallet_distribution_type + '_' + self.dataset_name + '_' +
+                                    self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter))
                 print('@ ' + self.model_name + ' seed selection @ dataset_name = ' + self.dataset_name + '_' + self.cascade_model + ', product_name = ' + self.product_name +
                       ', bud_iter = ' + str(b_iter) + ', budget = ' + str(total_budget) + ', sample_count = ' + str(sample_count))
                 mep_item = heap.heappop_max(degree_heap)
@@ -1652,7 +1581,8 @@ class ModelPW:
                         temp_sequence_flag = True
                         b_iter = bud_iter.pop(0)
                         heap.heappush_max(degree_heap, mep_item)
-                        saveTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter,
+                        saveTempSequence(self.model_name + '_' + self.wallet_distribution_type + '_' + self.dataset_name + '_' +
+                                         self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter),
                                          [ss_time, now_budget, seed_set, degree_heap])
                         mep_item = heap.heappop_max(degree_heap)
                         mep_deg, mep_k_prod, mep_i_node = mep_item
@@ -1694,7 +1624,7 @@ class ModelPW:
 
         seed_set_sequence = [[-1 for _ in range(self.sample_number)] for _ in range(len(self.budget_iteration))]
         ss_time_sequence = [[-1 for _ in range(self.sample_number)] for _ in range(len(self.budget_iteration))]
-        sshdpw_model = SeedSelectionHDPW(graph_dict, seed_cost_dict, product_list, product_weight_list)
+        sshdpw_model = SeedSelectionHDPW(self.dataset_name, graph_dict, product_list, product_weight_list)
         for sample_count in range(self.sample_number):
             ss_start_time = time.time()
             bud_iter = self.budget_iteration.copy()
@@ -1704,7 +1634,8 @@ class ModelPW:
             degree_heap = sshdpw_model.generateExpandDegreeHeap()
             ss_acc_time = round(time.time() - ss_start_time, 4)
             temp_sequence_flag = True
-            saveTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter,
+            saveTempSequence(self.model_name + '_' + self.wallet_distribution_type + '_' + self.dataset_name + '_' +
+                             self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter),
                              [ss_acc_time, now_budget, seed_set, degree_heap])
             while temp_sequence_flag:
                 ss_start_time = time.time()
@@ -1712,7 +1643,8 @@ class ModelPW:
                 bi_index = self.budget_iteration.index(b_iter)
                 total_budget = round(total_cost / (2 ** b_iter), 4)
                 [ss_acc_time, now_budget, seed_set, degree_heap] = \
-                    getTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter, 3)
+                    getTempSequence(self.model_name + '_' + self.wallet_distribution_type + '_' + self.dataset_name + '_' +
+                                    self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter))
                 print('@ ' + self.model_name + ' seed selection @ dataset_name = ' + self.dataset_name + '_' + self.cascade_model + ', product_name = ' + self.product_name +
                       ', bud_iter = ' + str(b_iter) + ', budget = ' + str(total_budget) + ', sample_count = ' + str(sample_count))
                 mep_item = heap.heappop_max(degree_heap)
@@ -1725,7 +1657,8 @@ class ModelPW:
                         temp_sequence_flag = True
                         b_iter = bud_iter.pop(0)
                         heap.heappush_max(degree_heap, mep_item)
-                        saveTempSequence(self.model_name, self.dataset_name, self.product_name, self.cascade_model, b_iter,
+                        saveTempSequence(self.model_name + '_' + self.wallet_distribution_type + '_' + self.dataset_name + '_' +
+                                         self.cascade_model + '_' + self.product_name + '_bi' + str(b_iter),
                                          [ss_time, now_budget, seed_set, degree_heap])
                         mep_item = heap.heappop_max(degree_heap)
                         mep_deg, mep_k_prod, mep_i_node = mep_item
