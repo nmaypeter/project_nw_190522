@@ -4,16 +4,18 @@ import numpy as np
 
 
 def output(cascade_model, dataset_name, product_name, wallet_distribution_type, ppp_strategy, model_name, eva_time, result10_pro_list):
-    path = [cascade_model, dataset_name, product_name, wallet_distribution_type, ppp_strategy, model_name + '\t']
-    result10_mean = np.mean(result10_pro_list)
-    result10_std = np.std(result10_pro_list)
-    result10_max = max(result10_pro_list)
-    result10_min = min(result10_pro_list)
-    result10_list = [eva_time, round(float(result10_mean), 4), round(float(result10_std), 4),
-                     round(float(result10_mean) - 3 * float(result10_std), 4), round(float(result10_mean) + 3 * float(result10_std), 4),
-                     result10_max, result10_min, '\t']
-    result10_pro_list.sort()
-    result10 = path + result10_list + result10_pro_list
+    result10 = []
+    if result10_pro_list:
+        path = [cascade_model, dataset_name, product_name, wallet_distribution_type, ppp_strategy, model_name, '\t']
+        result10_mean = np.mean(result10_pro_list)
+        result10_std = np.std(result10_pro_list)
+        result10_max = max(result10_pro_list)
+        result10_min = min(result10_pro_list)
+        result10_list = [eva_time, round(float(result10_mean), 4), round(float(result10_std), 4),
+                         round(float(result10_mean) - 3 * float(result10_std), 4), round(float(result10_mean) + 3 * float(result10_std), 4),
+                         result10_max, result10_min, '\t']
+        result10_pro_list.sort()
+        result10 = path + result10_list + result10_pro_list
 
     wb = load_workbook('sample.xlsx')
     sheet = wb.active
@@ -46,7 +48,7 @@ if __name__ == '__main__':
                         for model_name in model_seq:
                             ppp_strategy = 'random' * (ppp == 1) + 'expensive' * (ppp == 2) + 'cheap' * (ppp == 3)
                             try:
-                                path = 'result/' + model_name + '_' + wallet_distribution_type + '_ppp' + str(ppp) + '_wpiwp'
+                                path = 'sample_result/' + model_name + '_' + wallet_distribution_type + '_ppp' + str(ppp) + '_wpiwp'
                                 seed_set = []
                                 with open(path + '/' + dataset_name + '_' + cascade_model + '_' + product_name + '_bi10.txt') as f:
                                     for lnum, line in enumerate(f):
@@ -83,3 +85,4 @@ if __name__ == '__main__':
                                 output(cascade_model, dataset_name, product_name, wallet_distribution_type, ppp_strategy, model_name, eva_time, result10_pro_list)
                             except FileNotFoundError:
                                 output(cascade_model, dataset_name, product_name, wallet_distribution_type, ppp_strategy, model_name, 0.0, [])
+                        output('', '', '', '', '', '', 0.0, [])
