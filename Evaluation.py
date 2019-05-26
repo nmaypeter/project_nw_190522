@@ -1,5 +1,5 @@
 from Initialization import *
-import random
+from random import *
 import time
 import copy
 import os
@@ -74,13 +74,13 @@ class Evaluation:
     def getSeedSetProfit(self, s_set, wallet_dict, ppp_dict):
         s_total_set = set(s for k in range(self.num_product) for s in s_set[k])
         customer_set = [set() for _ in range(self.num_product)]
-        a_n_set, a_e_set = [s_set[k].copy() for k in range(self.num_product)], [{} for _ in range(self.num_product)]
-        a_n_sequence = [(k, s, 1) for k in range(self.num_product) for s in s_set[k]]
+        a_n_set = [s_set[k].copy() for k in range(self.num_product)]
+        a_n_sequence, a_n_sequence2 = [(k, s, 1) for k in range(self.num_product) for s in s_set[k]], []
         pro_k_list = [0.0 for _ in range(self.num_product)]
 
         eva = Evaluation(self.graph_dict, self.product_list, self.ppp, self.wpiwp)
         while a_n_sequence:
-            k_prod, i_node, i_acc_prob = a_n_sequence.pop(0)
+            k_prod, i_node, i_acc_prob = a_n_sequence.pop(choice([i for i in range(len(a_n_sequence))]))
             benefit, price = self.product_list[k_prod][0], self.product_list[k_prod][2]
 
             # -- notice: prevent the node from owing no receiver --
@@ -97,16 +97,9 @@ class Evaluation:
                     continue
                 if ii_node in a_n_set[k_prod]:
                     continue
-                if i_node in a_e_set[k_prod] and ii_node in a_e_set[k_prod][i_node]:
-                    continue
                 if ppp_dict[k_prod][ii_node] == 0:
                     continue
-
                 a_n_set[k_prod].add(ii_node)
-                if i_node in a_e_set:
-                    a_e_set[k_prod][i_node].add(ii_node)
-                else:
-                    a_e_set[k_prod][i_node] = {ii_node}
 
                 # -- purchasing --
                 dp = bool(0)
@@ -121,7 +114,10 @@ class Evaluation:
                 ### -- whether passing the information or not --
                 if not self.wpiwp or dp:
                     ii_acc_prob = i_acc_prob * i_dict[ii_node]
-                    a_n_sequence.append((k_prod, ii_node, ii_acc_prob))
+                    a_n_sequence2.append((k_prod, ii_node, ii_acc_prob))
+
+                if not a_n_sequence:
+                    a_n_sequence, a_n_sequence2 = a_n_sequence2, a_n_sequence
 
         pro_k_list = [round(pro_k, 4) for pro_k in pro_k_list]
         pnn_k_list = [len(customer) for customer in customer_set]
