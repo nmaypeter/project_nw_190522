@@ -1,6 +1,7 @@
 import random
 import numpy as np
 from scipy import stats
+from random import choice
 
 
 def safe_div(x, y):
@@ -21,14 +22,15 @@ class Diffusion:
         self.prob_threshold = 0.001
 
     def getSeedSetProfit(self, s_set):
+        s_total_set = set(s for k in range(self.num_product) for s in s_set[k])
         ep = 0.0
         for k in range(self.num_product):
-            a_n_set, a_e_set = s_set[k].copy(), {}
-            a_n_sequence = [(s, 1) for s in s_set[k]]
+            a_n_set, = s_set[k].copy()
+            a_n_sequence, a_n_sequence2 = [(s, 1) for s in s_set[k]], []
             benefit = self.product_list[k][0]
 
             while a_n_sequence:
-                i_node, i_acc_prob = a_n_sequence.pop(0)
+                i_node, i_acc_prob = a_n_sequence.pop(choice([i for i in range(len(a_n_sequence))]))
 
                 # -- notice: prevent the node from owing no receiver --
                 if i_node not in self.graph_dict:
@@ -39,71 +41,21 @@ class Diffusion:
                     if random.random() > i_dict[ii_node]:
                         continue
 
+                    if ii_node in s_total_set:
+                        continue
                     if ii_node in a_n_set:
                         continue
-                    if i_node in a_e_set and ii_node in a_e_set[i_node]:
-                        continue
-
                     a_n_set.add(ii_node)
-                    if i_node in a_e_set:
-                        a_e_set[i_node].add(ii_node)
-                    else:
-                        a_e_set[i_node] = {ii_node}
 
                     # -- purchasing --
                     ep += benefit
 
                     ii_acc_prob = round(i_acc_prob * i_dict[ii_node], 4)
-                    if ii_acc_prob >= self.prob_threshold:
-                        if ii_node not in self.graph_dict:
-                            continue
+                    if ii_acc_prob > self.prob_threshold:
+                        a_n_sequence2.append((ii_node, ii_acc_prob))
 
-                        ii_dict = self.graph_dict[ii_node]
-                        for iii_node in ii_dict:
-                            if random.random() > ii_dict[iii_node]:
-                                continue
-
-                            if iii_node in a_n_set:
-                                continue
-                            if ii_node in a_e_set and iii_node in a_e_set[ii_node]:
-                                continue
-
-                            a_n_set.add(iii_node)
-                            if ii_node in a_e_set:
-                                a_e_set[ii_node].add(iii_node)
-                            else:
-                                a_e_set[ii_node] = {iii_node}
-
-                            # -- purchasing --
-                            ep += benefit
-
-                            iii_acc_prob = round(ii_acc_prob * ii_dict[iii_node], 4)
-                            if iii_acc_prob >= self.prob_threshold:
-                                if iii_node not in self.graph_dict:
-                                    continue
-
-                                iii_dict = self.graph_dict[ii_node]
-                                for iv_node in iii_dict:
-                                    if random.random() > iii_dict[iv_node]:
-                                        continue
-
-                                    if iv_node in a_n_set:
-                                        continue
-                                    if iii_node in a_e_set and iv_node in a_e_set[iii_node]:
-                                        continue
-
-                                    a_n_set.add(iv_node)
-                                    if iii_node in a_e_set:
-                                        a_e_set[iii_node].add(iv_node)
-                                    else:
-                                        a_e_set[iii_node] = {iv_node}
-
-                                    # -- purchasing --
-                                    ep += benefit
-
-                                    iv_acc_prob = round(iii_acc_prob * iii_dict[iv_node], 4)
-                                    if iv_acc_prob > self.prob_threshold:
-                                        a_n_sequence.append((iv_node, iv_acc_prob))
+                if not a_n_sequence:
+                    a_n_sequence, a_n_sequence2 = a_n_sequence2, a_n_sequence
 
         return round(ep, 4)
 
@@ -137,15 +89,16 @@ class DiffusionPW:
         self.prob_threshold = 0.001
 
     def getSeedSetProfit(self, s_set):
+        s_total_set = set(s for k in range(self.num_product) for s in s_set[k])
         ep = 0.0
         for k in range(self.num_product):
-            a_n_set, a_e_set = s_set[k].copy(), {}
-            a_n_sequence = [(s, 1) for s in s_set[k]]
+            a_n_set, = s_set[k].copy()
+            a_n_sequence, a_n_sequence2 = [(s, 1) for s in s_set[k]], []
             benefit = self.product_list[k][0]
             product_weight = self.product_weight_list[k]
 
             while a_n_sequence:
-                i_node, i_acc_prob = a_n_sequence.pop(0)
+                i_node, i_acc_prob = a_n_sequence.pop(choice([i for i in range(len(a_n_sequence))]))
 
                 # -- notice: prevent the node from owing no receiver --
                 if i_node not in self.graph_dict:
@@ -156,71 +109,21 @@ class DiffusionPW:
                     if random.random() > i_dict[ii_node]:
                         continue
 
+                    if ii_node in s_total_set:
+                        continue
                     if ii_node in a_n_set:
                         continue
-                    if i_node in a_e_set and ii_node in a_e_set[i_node]:
-                        continue
-
                     a_n_set.add(ii_node)
-                    if i_node in a_e_set:
-                        a_e_set[i_node].add(ii_node)
-                    else:
-                        a_e_set[i_node] = {ii_node}
 
                     # -- purchasing --
                     ep += benefit * product_weight
 
                     ii_acc_prob = round(i_acc_prob * i_dict[ii_node], 4)
-                    if ii_acc_prob >= self.prob_threshold:
-                        if ii_node not in self.graph_dict:
-                            continue
+                    if ii_acc_prob > self.prob_threshold:
+                        a_n_sequence2.append((ii_node, ii_acc_prob))
 
-                        ii_dict = self.graph_dict[ii_node]
-                        for iii_node in ii_dict:
-                            if random.random() > ii_dict[iii_node]:
-                                continue
-
-                            if iii_node in a_n_set:
-                                continue
-                            if ii_node in a_e_set and iii_node in a_e_set[ii_node]:
-                                continue
-
-                            a_n_set.add(iii_node)
-                            if ii_node in a_e_set:
-                                a_e_set[ii_node].add(iii_node)
-                            else:
-                                a_e_set[ii_node] = {iii_node}
-
-                            # -- purchasing --
-                            ep += benefit * product_weight
-
-                            iii_acc_prob = round(ii_acc_prob * ii_dict[iii_node], 4)
-                            if iii_acc_prob >= self.prob_threshold:
-                                if iii_node not in self.graph_dict:
-                                    continue
-
-                                iii_dict = self.graph_dict[ii_node]
-                                for iv_node in iii_dict:
-                                    if random.random() > iii_dict[iv_node]:
-                                        continue
-
-                                    if iv_node in a_n_set:
-                                        continue
-                                    if iii_node in a_e_set and iv_node in a_e_set[iii_node]:
-                                        continue
-
-                                    a_n_set.add(iv_node)
-                                    if iii_node in a_e_set:
-                                        a_e_set[iii_node].add(iv_node)
-                                    else:
-                                        a_e_set[iii_node] = {iv_node}
-
-                                    # -- purchasing --
-                                    ep += benefit * product_weight
-
-                                    iv_acc_prob = round(iii_acc_prob * iii_dict[iv_node], 4)
-                                    if iv_acc_prob > self.prob_threshold:
-                                        a_n_sequence.append((iv_node, iv_acc_prob))
+                if not a_n_sequence:
+                    a_n_sequence, a_n_sequence2 = a_n_sequence2, a_n_sequence
 
         return round(ep, 4)
 
@@ -306,94 +209,77 @@ class DiffusionAccProb:
 
         return i_dict
 
-    def buildNodeAncDict(self, s_set, i_node, i_acc_prob, i_anc_set):
-        i_dict = {}
+    def buildSeedSetExpectedInfDictBatch(self, s_set, i_node, mep_item_seq, i_mep_item_id_seq, i_acc_prob):
+        s_dict_seq = [{} for _ in range(len(mep_item_seq))]
 
-        if i_node in self.graph_dict:
+        if i_node in self.graph_dict and i_mep_item_id_seq:
             for ii_node in self.graph_dict[i_node]:
                 if ii_node in s_set:
                     continue
                 ii_prob = round(float(self.graph_dict[i_node][ii_node]) * i_acc_prob, 4)
 
                 if ii_prob >= self.prob_threshold:
-                    ii_anc_set = i_anc_set.copy()
-                    ii_anc_set.add(ii_node)
-                    insertProbAncIntoDict(i_dict, ii_node, ii_prob, ii_anc_set)
+                    ii_mep_item_id_seq = []
+                    for mep_item_id in i_mep_item_id_seq:
+                        if mep_item_seq[mep_item_id][1] != ii_node:
+                            ii_mep_item_id_seq.append(mep_item_id)
+                            insertProbIntoDict(s_dict_seq[mep_item_id], ii_node, ii_prob)
 
-                    if ii_node in self.graph_dict:
+                    if ii_node in self.graph_dict and ii_mep_item_id_seq:
                         for iii_node in self.graph_dict[ii_node]:
                             if iii_node in s_set:
                                 continue
                             iii_prob = round(float(self.graph_dict[ii_node][iii_node]) * ii_prob, 4)
 
                             if iii_prob >= self.prob_threshold:
-                                iii_anc_set = ii_anc_set.copy()
-                                iii_anc_set.add(iii_node)
-                                insertProbAncIntoDict(i_dict, iii_node, iii_prob, iii_anc_set)
+                                iii_mep_item_id_seq = []
+                                for mep_item_id in ii_mep_item_id_seq:
+                                    if mep_item_seq[mep_item_id][1] != iii_node:
+                                        iii_mep_item_id_seq.append(mep_item_id)
+                                        insertProbIntoDict(s_dict_seq[mep_item_id], iii_node, iii_prob)
 
-                                if iii_node in self.graph_dict:
+                                if iii_node in self.graph_dict and iii_mep_item_id_seq:
                                     for iv_node in self.graph_dict[iii_node]:
                                         if iv_node in s_set:
                                             continue
                                         iv_prob = round(float(self.graph_dict[iii_node][iv_node]) * iii_prob, 4)
 
                                         if iv_prob >= self.prob_threshold:
-                                            iv_anc_set = iii_anc_set.copy()
-                                            iv_anc_set.add(iv_node)
-                                            insertProbAncIntoDict(i_dict, iv_node, iv_prob, iv_anc_set)
+                                            iv_mep_item_id_seq = []
+                                            for mep_item_id in iii_mep_item_id_seq:
+                                                if mep_item_seq[mep_item_id][1] != iv_node:
+                                                    iv_mep_item_id_seq.append(mep_item_id)
+                                                    insertProbIntoDict(s_dict_seq[mep_item_id], iv_node, iv_prob)
 
-                                            if iv_node in self.graph_dict and iv_prob > self.prob_threshold:
+                                            if iv_node in self.graph_dict and iv_mep_item_id_seq and iv_prob > self.prob_threshold:
                                                 diff_d = DiffusionAccProb(self.graph_dict, self.product_list)
-                                                iv_dict = diff_d.buildNodeAncDict(s_set, iv_node, iv_prob, iv_anc_set)
-                                                combineDict(i_dict, iv_dict)
+                                                iv_dict = diff_d.buildSeedSetExpectedInfDictBatch(s_set, iv_node, mep_item_seq, iv_mep_item_id_seq, iv_prob)
+                                                for dl in range(len(mep_item_seq)):
+                                                    combineDict(s_dict_seq[dl], iv_dict[dl])
 
-        return i_dict
+        return s_dict_seq
 
-    def updateNowSeedForest(self, s_set, seed_forest, i_node):
-        now_seed_forest = {}
-
-        for i in seed_forest:
-            for i_prob, i_anc in seed_forest[i]:
-                if i_node not in i_anc:
-                    insertProbAncIntoDict(now_seed_forest, i, i_prob, i_anc)
-
-        diff_d = DiffusionAccProb(self.graph_dict, self.product_list)
-        node_anc_dict = diff_d.buildNodeAncDict(s_set, i_node, 1, set())
-        combineDict(now_seed_forest, node_anc_dict)
-
-        return now_seed_forest
-
-    def updateNowSeedForestExpectedInfBatch(self, s_set, seed_forest, mep_item_seq):
-        now_seed_forest_seq = [{} for _ in range(len(mep_item_seq))]
-
-        for i in seed_forest:
-            for i_prob, i_anc in seed_forest[i]:
-                for mep_item_seq_item in mep_item_seq:
-                    if mep_item_seq_item[1] not in i_anc:
-                        mep_item_seq_id = mep_item_seq.index(mep_item_seq_item)
-                        insertProbIntoDict(now_seed_forest_seq[mep_item_seq_id], i, i_prob)
-
-        diff_d = DiffusionAccProb(self.graph_dict, self.product_list)
-        for mep_item_seq_item in mep_item_seq:
-            s_set_t = s_set.copy()
-            s_set_t.add(mep_item_seq_item[1])
-            node_anc_dict = diff_d.buildNodeExpectedInfDict(s_set_t, mep_item_seq_item[1], 1)
-            mep_item_seq_id = mep_item_seq.index(mep_item_seq_item)
-            combineDict(now_seed_forest_seq[mep_item_seq_id], node_anc_dict)
-
-        return now_seed_forest_seq
-
-    def updateNodeDictBatch(self, s_set, now_seed_forest, mep_item_seq):
+    def updateExpectedInfBatch(self, s_set, mep_item_seq):
+        s_total_set = set(s for k in range(self.num_product) for s in s_set[k])
         mep_item_seq = [(mep_item_l[1], mep_item_l[2]) for mep_item_l in mep_item_seq]
         mep_item_dictionary = [{} for _ in range(len(mep_item_seq))]
         diff_d = DiffusionAccProb(self.graph_dict, self.product_list)
 
         for k in range(self.num_product):
             mep_item_seq_temp = [mep_item_temp for mep_item_temp in mep_item_seq if mep_item_temp[0] == k]
-            now_seed_forest_seq = diff_d.updateNowSeedForestExpectedInfBatch(s_set[k], now_seed_forest[k], mep_item_seq_temp)
-            for mep_item_seq_temp_item in mep_item_seq_temp:
-                mep_item_id = mep_item_seq.index(mep_item_seq_temp_item)
-                mep_item_s_dict = now_seed_forest_seq.pop(0)
-                mep_item_dictionary[mep_item_id] = mep_item_s_dict
+            if mep_item_seq_temp:
+                for s in s_set[k]:
+                    s_dict_seq = diff_d.buildSeedSetExpectedInfDictBatch(s_total_set, s, mep_item_seq_temp, [mep_item_id for mep_item_id in range(len(mep_item_seq_temp))], 1)
+                    for mep_item_seq_temp_item in mep_item_seq_temp:
+                        mep_item_id = mep_item_seq.index(mep_item_seq_temp_item)
+                        mep_item_s_dict = s_dict_seq.pop(0)
+                        mep_item_dictionary[mep_item_id] = mep_item_s_dict
+
+        for mep_item_seq_item in mep_item_seq:
+            s_set_t = s_total_set.copy()
+            s_set_t.add(mep_item_seq_item[1])
+            node_anc_dict = diff_d.buildNodeExpectedInfDict(s_set_t, mep_item_seq_item[1], 1)
+            mep_item_seq_id = mep_item_seq.index(mep_item_seq_item)
+            combineDict(mep_item_dictionary[mep_item_seq_id], node_anc_dict)
 
         return mep_item_dictionary
