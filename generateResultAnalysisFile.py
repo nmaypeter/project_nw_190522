@@ -4,7 +4,7 @@ prod_seq = [1, 2]
 wallet_distribution_seq = [1, 2]
 ppp_seq = [2, 3]
 model_seq = ['mng', 'mngpw', 'mngr', 'mngrpw', 'mngsr', 'mngsrpw',
-             'mngap', 'mngappw', 'mngapr', 'mngaprpw', 'mngapsr', 'mngapsrpw',
+             'mngap', 'mngappw', 'mngapepw', 'mngapr', 'mngaprpw', 'mngaprepw', 'mngapsr', 'mngapsrpw', 'mngapsrepw',
              'mhd', 'mhdpw', 'mhed', 'mhedpw',
              'mpmis', 'mr']
 num_product = 3
