@@ -13,7 +13,7 @@ def output(cascade_model, dataset_name, product_name, wallet_distribution_type, 
         result10_min = min(result10_pro_list)
         result10_list = [eva_time, round(float(result10_mean), 4), round(float(result10_std), 4),
                          round(float(result10_mean) - 3 * float(result10_std), 4), round(float(result10_mean) + 3 * float(result10_std), 4),
-                         result10_max, result10_min, '\t']
+                         result10_min, result10_max, '\t']
         result10_pro_list.sort()
         result10 = path + result10_list + result10_pro_list
 
