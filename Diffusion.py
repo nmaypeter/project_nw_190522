@@ -25,7 +25,7 @@ class Diffusion:
         s_total_set = set(s for k in range(self.num_product) for s in s_set[k])
         ep = 0.0
         for k in range(self.num_product):
-            a_n_set, = s_set[k].copy()
+            a_n_set = s_set[k].copy()
             a_n_sequence, a_n_sequence2 = [(s, 1) for s in s_set[k]], []
             benefit = self.product_list[k][0]
 
@@ -279,6 +279,134 @@ class DiffusionAccProb:
             s_set_t = s_total_set.copy()
             s_set_t.add(mep_item_seq_item[1])
             node_anc_dict = diff_d.buildNodeExpectedInfDict(s_set_t, mep_item_seq_item[1], 1)
+            mep_item_seq_id = mep_item_seq.index(mep_item_seq_item)
+            combineDict(mep_item_dictionary[mep_item_seq_id], node_anc_dict)
+
+        return mep_item_dictionary
+
+
+class DiffusionEdgeAccProb:
+    def __init__(self, graph_dict, product_list, product_weight_list):
+        ### graph_dict: (dict) the graph
+        ### product_list: (list) the set to record products [kk's profit, kk's cost, kk's price]
+        ### num_node: (int) the number of nodes
+        ### num_product: (int) the kinds of products
+        ### product_weight_list: (list) the product weight list
+        self.graph_dict = graph_dict
+        self.product_list = product_list
+        self.num_product = len(product_list)
+        self.product_weight_list = product_weight_list
+        self.prob_threshold = 0.001
+
+    def buildNodeExpectedInfDict(self, s_set, k_prod, i_node, i_acc_prob):
+        product_weight = self.product_weight_list[k_prod]
+        i_dict = {}
+
+        if i_node in self.graph_dict:
+            for ii_node in self.graph_dict[i_node]:
+                if ii_node in s_set:
+                    continue
+                ii_prob = round(float(self.graph_dict[i_node][ii_node]) * i_acc_prob * product_weight, 4)
+
+                if ii_prob >= self.prob_threshold:
+                    insertProbIntoDict(i_dict, ii_node, ii_prob)
+
+                    if ii_node in self.graph_dict:
+                        for iii_node in self.graph_dict[ii_node]:
+                            if iii_node in s_set:
+                                continue
+                            iii_prob = round(float(self.graph_dict[ii_node][iii_node]) * ii_prob * product_weight, 4)
+
+                            if iii_prob >= self.prob_threshold:
+                                insertProbIntoDict(i_dict, iii_node, iii_prob)
+
+                                if iii_node in self.graph_dict:
+                                    for iv_node in self.graph_dict[iii_node]:
+                                        if iv_node in s_set:
+                                            continue
+                                        iv_prob = round(float(self.graph_dict[iii_node][iv_node]) * iii_prob * product_weight, 4)
+
+                                        if iv_prob >= self.prob_threshold:
+                                            insertProbIntoDict(i_dict, iv_node, iv_prob)
+
+                                            if iv_node in self.graph_dict and iv_prob > self.prob_threshold:
+                                                diff_d = DiffusionEdgeAccProb(self.graph_dict, self.product_list, self.product_weight_list)
+                                                iv_dict = diff_d.buildNodeExpectedInfDict(s_set, k_prod, iv_node, iv_prob)
+                                                combineDict(i_dict, iv_dict)
+
+        return i_dict
+
+    def buildSeedSetExpectedInfDictBatch(self, s_set, k_prod, i_node, mep_item_seq, i_mep_item_id_seq, i_acc_prob):
+        product_weight = self.product_weight_list[k_prod]
+        s_dict_seq = [{} for _ in range(len(mep_item_seq))]
+
+        if i_node in self.graph_dict and i_mep_item_id_seq:
+            for ii_node in self.graph_dict[i_node]:
+                if ii_node in s_set:
+                    continue
+                ii_prob = round(float(self.graph_dict[i_node][ii_node]) * i_acc_prob * product_weight, 4)
+
+                if ii_prob >= self.prob_threshold:
+                    ii_mep_item_id_seq = []
+                    for mep_item_id in i_mep_item_id_seq:
+                        if mep_item_seq[mep_item_id][1] != ii_node:
+                            ii_mep_item_id_seq.append(mep_item_id)
+                            insertProbIntoDict(s_dict_seq[mep_item_id], ii_node, ii_prob)
+
+                    if ii_node in self.graph_dict and ii_mep_item_id_seq:
+                        for iii_node in self.graph_dict[ii_node]:
+                            if iii_node in s_set:
+                                continue
+                            iii_prob = round(float(self.graph_dict[ii_node][iii_node]) * ii_prob * product_weight, 4)
+
+                            if iii_prob >= self.prob_threshold:
+                                iii_mep_item_id_seq = []
+                                for mep_item_id in ii_mep_item_id_seq:
+                                    if mep_item_seq[mep_item_id][1] != iii_node:
+                                        iii_mep_item_id_seq.append(mep_item_id)
+                                        insertProbIntoDict(s_dict_seq[mep_item_id], iii_node, iii_prob)
+
+                                if iii_node in self.graph_dict and iii_mep_item_id_seq:
+                                    for iv_node in self.graph_dict[iii_node]:
+                                        if iv_node in s_set:
+                                            continue
+                                        iv_prob = round(float(self.graph_dict[iii_node][iv_node]) * iii_prob * product_weight, 4)
+
+                                        if iv_prob >= self.prob_threshold:
+                                            iv_mep_item_id_seq = []
+                                            for mep_item_id in iii_mep_item_id_seq:
+                                                if mep_item_seq[mep_item_id][1] != iv_node:
+                                                    iv_mep_item_id_seq.append(mep_item_id)
+                                                    insertProbIntoDict(s_dict_seq[mep_item_id], iv_node, iv_prob)
+
+                                            if iv_node in self.graph_dict and iv_mep_item_id_seq and iv_prob > self.prob_threshold:
+                                                diff_d = DiffusionEdgeAccProb(self.graph_dict, self.product_list, self.product_weight_list)
+                                                iv_dict = diff_d.buildSeedSetExpectedInfDictBatch(s_set, k_prod, iv_node, mep_item_seq, iv_mep_item_id_seq, iv_prob)
+                                                for dl in range(len(mep_item_seq)):
+                                                    combineDict(s_dict_seq[dl], iv_dict[dl])
+
+        return s_dict_seq
+
+    def updateExpectedInfBatch(self, s_set, mep_item_seq):
+        s_total_set = set(s for k in range(self.num_product) for s in s_set[k])
+        mep_item_seq = [(mep_item_l[1], mep_item_l[2]) for mep_item_l in mep_item_seq]
+        mep_item_dictionary = [{} for _ in range(len(mep_item_seq))]
+        diff_d = DiffusionEdgeAccProb(self.graph_dict, self.product_list, self.product_weight_list)
+
+        for k in range(self.num_product):
+            mep_item_seq_temp = [mep_item_temp for mep_item_temp in mep_item_seq if mep_item_temp[0] == k]
+            if mep_item_seq_temp:
+                for s in s_set[k]:
+                    s_dict_seq = diff_d.buildSeedSetExpectedInfDictBatch(s_total_set, k, s, mep_item_seq_temp, [mep_item_id for mep_item_id in range(len(mep_item_seq_temp))], 1)
+                    for mep_item_seq_temp_item in mep_item_seq_temp:
+                        mep_item_id = mep_item_seq.index(mep_item_seq_temp_item)
+                        mep_item_s_dict = s_dict_seq.pop(0)
+                        mep_item_dictionary[mep_item_id] = mep_item_s_dict
+
+        for mep_item_seq_item in mep_item_seq:
+            s_set_t = s_total_set.copy()
+            s_set_t.add(mep_item_seq_item[1])
+            node_anc_dict = diff_d.buildNodeExpectedInfDict(s_set_t, mep_item_seq_item[0], mep_item_seq_item[1], 1)
             mep_item_seq_id = mep_item_seq.index(mep_item_seq_item)
             combineDict(mep_item_dictionary[mep_item_seq_id], node_anc_dict)
 
