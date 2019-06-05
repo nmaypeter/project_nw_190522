@@ -40,7 +40,7 @@ class SeedSelectionPMIS:
         mep_result = (0.0, [set() for _ in range(self.num_product)])
         ### bud_index: (list) the using budget index for products
         ### bud_bound_index: (list) the bound budget index for products
-        bud_index, bud_bound_index = [len(kk) - 1 for kk in c_matrix], [0 for _ in range(self.num_product)]
+        bud_index, bud_bound_index = [len(k) - 1 for k in c_matrix], [0 for _ in range(self.num_product)]
         ### temp_bound_index: (list) the bound to exclude the impossible budget combination s.t. the k-budget is smaller than the temp bound
         temp_bound_index = [0 for _ in range(self.num_product)]
 
@@ -49,13 +49,13 @@ class SeedSelectionPMIS:
             ### bud_pmis: (float) the budget in this pmis execution
             bud_pmis = 0.0
             for k in range(self.num_product):
-                bud_pmis += copy.deepcopy(c_matrix)[k][bud_index[k]]
+                bud_pmis += c_matrix[k][bud_index[k]]
 
             if bud_pmis <= bud:
-                temp_bound_flag = 1
+                temp_bound_flag = True
                 for k in range(self.num_product):
                     if temp_bound_index[k] > bud_index[k]:
-                        temp_bound_flag = 0
+                        temp_bound_flag = False
                         break
                 if temp_bound_flag:
                     temp_bound_index = copy.deepcopy(bud_index)
