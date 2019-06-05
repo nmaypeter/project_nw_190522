@@ -2,6 +2,7 @@ from random import choice
 import numpy as np
 from scipy import stats
 
+
 def getQuantiles(pd, mu, sigma):
     discrimination = -2 * sigma**2 * np.log(pd * sigma * np.sqrt(2 * np.pi))
 
