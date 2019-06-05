@@ -23,10 +23,11 @@ class Initialization:
                 deg_dict[node] = int(degree)
         f.close()
 
+        alpha = 0.5
         for k in range(num_product):
             cost = prod_list[k][1]
             for i in deg_dict:
-                seed_cost_dict[k][i] = round(deg_dict[i] / max_deg + cost, 4)
+                seed_cost_dict[k][i] = round(alpha * deg_dict[i] / max_deg + (1 - alpha) * cost, 4)
 
         return seed_cost_dict
 
