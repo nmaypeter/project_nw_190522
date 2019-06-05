@@ -26,7 +26,7 @@ for cm in cm_seq:
                     number_seed = ['' for _ in range(num_product)]
                     for model_name in model_seq:
                         try:
-                            result_name = 'result/' + \
+                            result_name = 'result_1000/' + \
                                           model_name + '_' + wallet_distribution_type + '_ppp' + str(ppp_seq[0]) + '_wpiwp/' + \
                                           dataset_name + '_' + cascade_model + '_' + product_name + '_bi' + str(bi) + '.txt'
                             print(result_name)
@@ -61,7 +61,7 @@ for cm in cm_seq:
                         profit = ''
                         for model_name in model_seq:
                             try:
-                                result_name = 'result/' + \
+                                result_name = 'result_1000/' + \
                                               model_name + '_' + wallet_distribution_type + '_ppp' + str(ppp) + '_wpiwp/' + \
                                               dataset_name + '_' + cascade_model + '_' + product_name + '_bi' + str(bi) + '.txt'
 
@@ -71,14 +71,16 @@ for cm in cm_seq:
                                             continue
                                         elif lnum == 3:
                                             (l) = line.split()
-                                            profit += l[2].rstrip(',') + '\t'
+                                            p = float(l[2].rstrip(','))
+                                            c = float(l[5])
+                                            profit += str(round(p - c, 4)) + '\t'
                                         else:
                                             break
                             except FileNotFoundError:
                                 profit += '\t'
                         profit_list.append(profit)
 
-    path = 'result/result_analysis_' + cascade_model
+    path = 'result_1000/result_analysis_' + cascade_model
     fw = open(path + '_profit.txt', 'w')
     for lnum, line in enumerate(profit_list):
         if lnum % (len(prod_seq) * len(wallet_distribution_seq) * len(ppp_seq)) == 0 and lnum != 0:
